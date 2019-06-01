@@ -8,15 +8,27 @@ namespace NetzwerkClientUDP
 {
     class Message
     {
-        public Verbindung verbindung;
-
         public enum MsgCommand
         {
             EXIT,
+            MSG,
             INFO,
             ECHO
         }
 
-        public int summe;
+        public Verbindung verbindung;
+        public MsgCommand command;
+        public int sum;
+        public string payload = "";
+        public int neightInformed;
+
+        public Message(Verbindung verbindung, MsgCommand command, int sum, int neightInformed=0, string payload="")
+        {
+            this.verbindung = verbindung;
+            this.command = command;
+            this.sum = sum;
+            this.payload = payload;
+            this.neightInformed = neightInformed;
+        }
     }
 }

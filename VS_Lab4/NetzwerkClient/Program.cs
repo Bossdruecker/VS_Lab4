@@ -2,13 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace NetzwerkClientUDP
 {
@@ -31,9 +28,6 @@ namespace NetzwerkClientUDP
             new int[] { 4,7,8,10 }
         };
 
-        //private static ReaderWriterLockSlim methodLock = new ReaderWriterLockSlim();
-        static object lockA = new object();
-        static object lockB = new object();
         static readonly int exitCode = 0;
         static int gesamtSpeicher = 0;
 
@@ -44,7 +38,7 @@ namespace NetzwerkClientUDP
             if (args.Length == 0)
             {
                 UdpClient udpServer = new UdpClient(5000);  //Port ist 5000
-                myCon = DefineNode(getLocalIP(), 5000, 0);
+                myCon = DefineNode(GetLocalIP(), 5000, 0);
 
                 for (int i = 1; i < 13; i++)
                 {
@@ -65,10 +59,20 @@ namespace NetzwerkClientUDP
                     {
                         for (int i = 0; i < 12; i++)
                         {
-                            Verbindung temp = network.Find(r => r.nodeNr == (i + 1));
+                            Verbindung temp = network.Find(r => r.NodeNr == (i + 1));
                             SendNeighbor(udpServer, temp, network);
                         }
                         Console.WriteLine("Das Netzwerk wurde erstellt und ist jetzt online");
+                        Console.WriteLine("Wenn sie das netzwerk herunterfahren wollen bitte #ja# tippen");
+                        string c = Console.ReadLine();
+                        if(c == "#ja#")
+                        {
+                            Message msg = new Message(myCon, Message.MsgCommand.EXIT, 0);
+                            string input = JsonConvert.SerializeObject(msg);
+                            Byte[] inputData = Encoding.ASCII.GetBytes(input);
+                            SendDataToNeight(udpServer, inputData, network);
+                            exitintern = false;
+                        }
                     }
                 }
             }
@@ -76,16 +80,15 @@ namespace NetzwerkClientUDP
             {
                 //Console.ReadKey();
                 UdpClient udpServer = new UdpClient(int.Parse(args[0]));
-                myCon = DefineNode(getLocalIP(), int.Parse(args[0]), int.Parse(args[1]));
+                myCon = DefineNode(GetLocalIP(), int.Parse(args[0]), int.Parse(args[1]));
 
 
                 string output = JsonConvert.SerializeObject(myCon);
                 Byte[] sendByte = Encoding.ASCII.GetBytes(output);
 
-                IPEndPoint ipEndPoint = new IPEndPoint(getLocalIP(), 5000);
-                //udpServer.Send(sendByte, sendByte.Length, ipEndPoint);
+                IPEndPoint ipEndPoint = new IPEndPoint(GetLocalIP(), 5000);
                 SendData(udpServer, ipEndPoint, sendByte);
-                Console.WriteLine(myCon.nodeNr.ToString() + " Knoten ist online!");
+                Console.WriteLine(myCon.NodeNr.ToString() + " Knoten ist online!");
 
 
                 //receive Modus
@@ -99,25 +102,30 @@ namespace NetzwerkClientUDP
                     network.Add(refNode);
                 }
 
-                Console.WriteLine(myCon.nodeNr.ToString() + " hat alle Kanten empfange und ist bereit");                         // <= ab hier sind die knoten bereit für den verteilten Algorithmus
+                Console.WriteLine(myCon.NodeNr.ToString() + " hat alle Kanten empfange und ist bereit");                         // <= ab hier sind die knoten bereit für den verteilten Algorithmus
 
                 Status st = new Status(network.Count, int.Parse(args[1]));
-                Thread ReceiveThread = new Thread(() => ReceiveDataThread(udpServer, int.Parse(args[0]), myCon, network, ref st));
-                Thread SendThread = new Thread(() => SendDataThread(udpServer, myCon, network, ref st));
-
-                SendThread.Start();
+                Thread ReceiveThread = new Thread(() => ReceiveDataThread(udpServer, int.Parse(args[0]), myCon, network, ref st))
+                {
+                    IsBackground = true
+                };
                 ReceiveThread.Start();
-                
 
+                Console.WriteLine("Wenn sie den Algo Starten wollen bitte !Start tippen");
 
-
-                //Random zufall = new Random();
-                //Thread.Sleep(zufall.Next(1000, 20000));
+                string start = Console.ReadLine();
+                if(start == "!Start")
+                {
+                    Message msg = new Message(myCon, Message.MsgCommand.INFO, 0);
+                    string input = JsonConvert.SerializeObject(msg);
+                    Byte[] inputData = Encoding.ASCII.GetBytes(input);
+                    SendDataToNeight(udpServer, inputData, network);
+                }
                 Console.ReadKey();
             }
         }
 
-        private static IPAddress getLocalIP()
+        private static IPAddress GetLocalIP()
         {
             IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
 
@@ -136,21 +144,21 @@ namespace NetzwerkClientUDP
         {
             Verbindung verb = new Verbindung
             {
-                addr = addr.ToString(),
-                port = port,
-                nodeNr = num
+                Addr = addr.ToString(),
+                Port = port,
+                NodeNr = num
             };
             return verb;
         }
 
         private static void SendNeighbor(UdpClient udpServer, Verbindung verb, List<Verbindung> network)
         {
-            for (int i = nodes[verb.nodeNr - 1].Length; i > 0; i--)
+            for (int i = nodes[verb.NodeNr - 1].Length; i > 0; i--)
             {
-                Verbindung temp = network.Find(r => r.nodeNr == nodes[verb.nodeNr - 1][i - 1]);
+                Verbindung temp = network.Find(r => r.NodeNr == nodes[verb.NodeNr - 1][i - 1]);
                 string output = JsonConvert.SerializeObject(temp);
                 Byte[] sendByte = Encoding.ASCII.GetBytes(output);
-                SendData(udpServer, new IPEndPoint(IPAddress.Parse(verb.addr), verb.port), sendByte);
+                SendData(udpServer, new IPEndPoint(IPAddress.Parse(verb.Addr), verb.Port), sendByte);
             }
         }
 
@@ -163,7 +171,7 @@ namespace NetzwerkClientUDP
 
             while (exit)
             {
-                Thread.Sleep(1000);
+                //Thread.Sleep(1000);
                 var groupEP = new IPEndPoint(IPAddress.Any, port);
                 Byte[] data = udpServer.Receive(ref groupEP);
                 string returnData = Encoding.ASCII.GetString(data);
@@ -171,50 +179,41 @@ namespace NetzwerkClientUDP
                 switch (msg.command)
                 {
                     case Message.MsgCommand.EXIT:
-                        changeMsgCommand(ref msg, Message.MsgCommand.EXIT);
-                        output = JsonConvert.SerializeObject(msg);
-                        sendByte = Encoding.ASCII.GetBytes(output);
-                        netw.ForEach(delegate (Verbindung v)
-                        {
-                            SendData(udpServer, new IPEndPoint(IPAddress.Parse(v.addr), v.port), sendByte);
-                            Console.WriteLine("Info an " + v.port.ToString() + " gesendet!");
-                        });
-                        Console.ReadKey();
                         Environment.Exit(exitCode);
                         break;
                     case Message.MsgCommand.MSG:
-                        Console.WriteLine("msg from: " + msg.verbindung.port + ": " + msg.payload);
+                        Console.WriteLine("msg from: " + msg.verbindung.Port + ": " + msg.payload);
                         break;
                     case Message.MsgCommand.INFO:
-                        Console.WriteLine("Info von " + msg.verbindung.port.ToString() + " bekommen!");
-                        incNeightInformed(ref msg);
+                        Console.WriteLine("Info von " + msg.verbindung.Port.ToString() + " bekommen!");
+                        IncNeightInformed(ref msg);
                         Console.WriteLine("out of is informed " + st.informed.ToString() + "incNeightInformed: " + msg.neightInformed.ToString());
-                        int node = msg.verbindung.port;
+                        int node = msg.verbindung.Port;
                         if (st.informed == false)
                         {
                             st.informed = true;
                             Console.WriteLine("in of is informed " + st.informed.ToString());
                             st.upward_Node = msg.verbindung;
-                            node = msg.verbindung.port;
+                            node = msg.verbindung.Port;
 
                             //msg = new Message(con, Message.MsgCommand.INFO, 0);
-                            changeMsgCommand(ref msg, Message.MsgCommand.INFO);
-                            changeCon(ref msg, con);
+                            ChangeMsgCommand(ref msg, Message.MsgCommand.INFO);
+                            ChangeCon(ref msg, con);
                             output = JsonConvert.SerializeObject(msg);
                             sendByte = Encoding.ASCII.GetBytes(output);
                             netw.ForEach(delegate (Verbindung v)
                             {
-                                if (v.port != node)
+                                if (v.Port != node)
                                 {
-                                    SendData(udpServer, new IPEndPoint(IPAddress.Parse(v.addr), v.port), sendByte);
-                                    Console.WriteLine("Info an " + v.port.ToString() + " gesendet!");
+                                    SendData(udpServer, new IPEndPoint(IPAddress.Parse(v.Addr), v.Port), sendByte);
+                                    Console.WriteLine("Info an " + v.Port.ToString() + " gesendet!");
                                 }
                             });
                             Console.WriteLine("in of is informed finisch Info on Neighs");
                         }
                         else
                         {
-                            Console.WriteLine("Bin informiert haben jedoch von " + msg.verbindung.port.ToString() + "Naschricht erhalten");
+                            Console.WriteLine("Bin informiert haben jedoch von " + msg.verbindung.Port.ToString() + "Naschricht erhalten");
                             if (st.AnzahlNachbarn == msg.neightInformed)
                             {
                                 Console.WriteLine("Alle Nachbarn wurden schon informiert");
@@ -227,13 +226,13 @@ namespace NetzwerkClientUDP
                                 {
                                     gesamtSpeicher += st.Speicher;
                                     //msg = new Message(con, Message.MsgCommand.ECHO, gesamtSpeicher);
-                                    changeMsgCommand(ref msg, Message.MsgCommand.ECHO);
-                                    changeCon(ref msg, con);
+                                    ChangeMsgCommand(ref msg, Message.MsgCommand.ECHO);
+                                    ChangeCon(ref msg, con);
 
                                     output = JsonConvert.SerializeObject(msg);
                                     sendByte = Encoding.ASCII.GetBytes(output);
-                                    SendData(udpServer, new IPEndPoint(int.Parse(st.upward_Node.addr), st.upward_Node.port), sendByte);
-                                    Console.WriteLine("ECHO an " + st.upward_Node.port.ToString() + " gesendet!");
+                                    SendData(udpServer, new IPEndPoint(int.Parse(st.upward_Node.Addr), st.upward_Node.Port), sendByte);
+                                    Console.WriteLine("ECHO an " + st.upward_Node.Port.ToString() + " gesendet!");
                                 }
                             }
                         }
@@ -250,73 +249,19 @@ namespace NetzwerkClientUDP
                         {
                             gesamtSpeicher += st.Speicher;
                             //msg = new Message(con, Message.MsgCommand.ECHO, gesamtSpeicher);
-                            changeMsgCommand(ref msg, Message.MsgCommand.ECHO);
-                            changeCon(ref msg, con);
-                            addSpeicher(ref msg, gesamtSpeicher);
+                            ChangeMsgCommand(ref msg, Message.MsgCommand.ECHO);
+                            ChangeCon(ref msg, con);
+                            AddSpeicher(ref msg, gesamtSpeicher);
                             output = JsonConvert.SerializeObject(msg);
                             sendByte = Encoding.ASCII.GetBytes(output);
-                            SendData(udpServer, new IPEndPoint(int.Parse(st.upward_Node.addr), st.upward_Node.port), sendByte);
-                            Console.WriteLine("ECHO an " + st.upward_Node.port.ToString() + " gesendet!");
+                            SendData(udpServer, new IPEndPoint(int.Parse(st.upward_Node.Addr), st.upward_Node.Port), sendByte);
+                            Console.WriteLine("ECHO an " + st.upward_Node.Port.ToString() + " gesendet!");
                         }
                         break;
                     default:
                         break;
                 }
                 //Console.WriteLine(Encoding.ASCII.GetString(data));
-            }
-            Console.WriteLine("Receive thread zuende");
-        }
-
-        //Nachricht aus der Console senden <= Thread Methode
-        private static void SendDataThread(UdpClient udpServer, Verbindung con, List<Verbindung> netw, ref Status st)
-        {
-            bool exit = true;
-            while (exit)
-            {
-                Thread.Sleep(1000);
-                String input = Console.ReadLine();
-                string output;
-                Message msg;
-                Byte[] sendByte;
-
-                switch (input)
-                {
-                    case "!Start":
-                        updateStatus(ref st, true, con);
-                        msg = new Message(con, Message.MsgCommand.INFO, 0);
-                        output = JsonConvert.SerializeObject(msg);
-                        sendByte = Encoding.ASCII.GetBytes(output);
-                        netw.ForEach(delegate (Verbindung v)
-                        {
-                            SendData(udpServer, new IPEndPoint(IPAddress.Parse(v.addr), v.port), sendByte);
-                            Console.WriteLine("Info an " + v.port.ToString() + " gesendet!");
-                        });
-                        break;
-                    //optional wenn man nachricht an alle knoten schicken möchte
-                    //case "!MSG":
-                    //    input = Console.ReadLine();
-                    //    msg = new Message(con, Message.MsgCommand.MSG, 0, input);
-                    //    break;
-                    //case "!Exit":
-                    //    //myProcess.Close();
-                    //    msg = new Message(con, Message.MsgCommand.EXIT, 0);
-                    //    output = JsonConvert.SerializeObject(msg);
-                    //    sendByte = Encoding.ASCII.GetBytes(output);
-                    //    netw.ForEach(delegate (Verbindung v)
-                    //    {
-                    //        SendData(udpServer, new IPEndPoint(IPAddress.Parse(v.addr), v.port), sendByte);
-                    //        Console.WriteLine("EXIT an " + v.port.ToString() + " gesendet!");
-                    //    });
-                    //    Console.ReadKey();
-                    //    Environment.Exit(exitCode);
-                    //    break;
-                    default:
-                        Console.WriteLine("Never Ever");
-                        break;
-                }
-                //sendByte = Encoding.ASCII.GetBytes(input);
-                //udpServer.Send(sendByte, sendByte.Length, ipEndPoint);
-                Console.WriteLine("gesendet! "  + st.informed.ToString() + " informed");
             }
             Console.WriteLine("Receive thread zuende");
         }
@@ -357,77 +302,19 @@ namespace NetzwerkClientUDP
         //Byte Array schicken
         private static void SendData(UdpClient udpServer, IPEndPoint ipEndPoint, Byte[] sendByte)
         {
-            //try
-            //{
-            //    Monitor.Enter(_object);
-            //        udpServer.Send(sendByte, sendByte.Length, ipEndPoint);
-            //    Monitor.Exit(_object);
-            //}
-            //catch (Exception ex)
-            //{
-            //    Console.WriteLine(ex.ToString());
-            //}
-            object o = new object();
-            bool locked = false;
-
-            try
-            {
-                Monitor.Enter(o, ref locked);
-
-                udpServer.Send(sendByte, sendByte.Length, ipEndPoint);
-            }
-            finally
-            {
-                if (locked) Monitor.Exit(o);
-            }
+            udpServer.Send(sendByte, sendByte.Length, ipEndPoint);
         }
 
-        private static void updateStatus(ref Status st, bool inf, Verbindung upwardNode)
+        private static void SendDataToNeight(UdpClient udpServer, Byte[] sendByte, List<Verbindung> network)
         {
-            //st.informed = inf;
-            //st.upward_Node = upwardNode;
-            //methodLock.EnterWriteLock();
-            //try
-            //{
-            //    st.informed = inf;
-            //    st.upward_Node = upwardNode;
-            //}
-            //finally
-            //{
-            //    methodLock.ExitReadLock();
-            //}
-            //lock (_object)
-            //{
-            //    st.informed = inf;
-            //    st.upward_Node = upwardNode;
-            //}
-            //try
-            //{
-            //    Monitor.Enter(_object);
-            //    st.informed = inf;
-            //    st.upward_Node = upwardNode;
-            //    Monitor.Exit(_object);
-            //}
-            //catch (Exception ex)
-            //{
-            //    Console.WriteLine(ex.ToString());
-            //}
-            object o = new object();
-            bool locked = false;
-
-            try
+            //udpServer.Send(sendByte, sendByte.Length, ipEndPoint);
+            foreach (Verbindung verb in network)
             {
-                Monitor.Enter(o, ref locked);
-                st.informed = inf;
-                st.upward_Node = upwardNode;
-            }
-            finally
-            {
-                if (locked) Monitor.Exit(o);
+                IPEndPoint ip = new IPEndPoint(IPAddress.Parse(verb.Addr), verb.Port);
+                udpServer.Send(sendByte, sendByte.Length, ip);
             }
         }
-
-        private static void incNeightInformed(ref Message msg)
+        private static void IncNeightInformed(ref Message msg)
         {
             //lock (_object)
             //{
@@ -456,7 +343,7 @@ namespace NetzwerkClientUDP
             }
         }
 
-        private static void changeMsgCommand(ref Message msg, Message.MsgCommand command)
+        private static void ChangeMsgCommand(ref Message msg, Message.MsgCommand command)
         {
             //try
             //{
@@ -485,7 +372,7 @@ namespace NetzwerkClientUDP
             }
         }
 
-        private static void changeCon(ref Message msg, Verbindung verb)
+        private static void ChangeCon(ref Message msg, Verbindung verb)
         {
 
             //try
@@ -515,7 +402,7 @@ namespace NetzwerkClientUDP
             }
         }
 
-        private static void addSpeicher(ref Message msg, int speicher)
+        private static void AddSpeicher(ref Message msg, int speicher)
         {
             //lock (_object)
             //{

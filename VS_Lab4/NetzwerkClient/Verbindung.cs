@@ -9,8 +9,8 @@ namespace NetzwerkClientUDP
 {
     class Verbindung
     {
-        public string addr { get; set; }
-        public int port { get; set; }
-        public int nodeNr { get; set; }
+        public string Addr { get; set; }
+        public int Port { get; set; }
+        public int NodeNr { get; set; }
     }
 }

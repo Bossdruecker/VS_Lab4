@@ -22,7 +22,7 @@ namespace NetzwerkClientUDP
         public string payload = "";
         public int neightInformed;
 
-        public Message(Verbindung verbindung, MsgCommand command, int sum, int neightInformed=0, string payload="")
+        public Message(Verbindung verbindung, MsgCommand command, int sum, int neightInformed=0, string payload=" ")
         {
             this.verbindung = verbindung;
             this.command = command;

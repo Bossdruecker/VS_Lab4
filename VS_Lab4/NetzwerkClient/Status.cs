@@ -9,16 +9,20 @@ namespace NetzwerkClientUDP
     class Status
     {
         public int AnzahlNachbarn { get; }
-        public bool informed { get; set; }
-        public Verbindung upward_Node { get; set; }
-        public int Speicher { get; }
+        public bool Informed { get; set; }
+        public Verbindung Upward_Node { get; set; }
+        public int Speicher { get; set; }
+        public int CountInformed { get; set; }
+        public bool online { get; set; }
+        public bool Initiator { get; set; }
 
         public Status(int AnzahlNachbarn, int Speicher, Verbindung upward_Node = null, bool informed = false)
         {
             this.AnzahlNachbarn = AnzahlNachbarn;
             this.Speicher = Speicher;
-            this.upward_Node = upward_Node;
-            this.informed = informed;
+            this.Upward_Node = upward_Node;
+            this.Informed = informed;
+            this.Initiator = false;
         }
     }
 }
